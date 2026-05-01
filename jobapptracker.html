@@ -53,8 +53,8 @@
     text-transform: uppercase;
   }
   .logo span { color: var(--muted); }
-  .header-right { display: flex; align-items: center; gap: 24px; }
-  .stats { display: flex; gap: 20px; }
+  .header-right { display: flex; align-items: center; gap: 12px; }
+  .stats { display: flex; gap: 20px; margin-right: 12px; }
   .stat { text-align: right; }
   .stat-val { font-family: var(--mono); font-size: 20px; line-height: 1; }
   .stat-lbl { font-size: 9px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-top: 2px; }
@@ -261,8 +261,8 @@
   }
   .btn-save:hover { background: #5fd88f; }
 
-  /* ── Print button ───────────────────────── */
-  .print-btn {
+  /* ── Utility buttons ────────────────────── */
+  .util-btn {
     font-family: var(--mono);
     font-size: 11px;
     color: var(--muted);
@@ -274,13 +274,139 @@
     letter-spacing: 0.08em;
     text-transform: uppercase;
     transition: color 0.15s, border-color 0.15s;
+    white-space: nowrap;
   }
-  .print-btn:hover { color: var(--text); border-color: var(--border2); }
+  .util-btn:hover { color: var(--text); border-color: var(--border2); }
 
+  /* ── Import modal ───────────────────────── */
+  .import-modal {
+    background: #131a14;
+    border: 0.5px solid var(--border2);
+    border-radius: 4px;
+    padding: 26px;
+    width: 380px;
+    max-width: 92vw;
+  }
+  .import-info {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.7;
+    margin-bottom: 18px;
+    padding: 10px 12px;
+    background: rgba(78,203,128,0.04);
+    border: 0.5px solid var(--border);
+    border-radius: 3px;
+  }
+  .import-info strong { color: var(--text); }
+  .import-mode-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 18px;
+  }
+  .mode-btn {
+    flex: 1;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 8px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+    border: 0.5px solid var(--border);
+    background: none;
+    color: var(--muted);
+    transition: all 0.15s;
+  }
+  .mode-btn.active {
+    background: var(--accent-d);
+    border-color: var(--border2);
+    color: var(--accent);
+  }
+  .mode-btn:hover:not(.active) { color: var(--text); border-color: var(--border2); }
+  .mode-desc {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    margin-bottom: 16px;
+    min-height: 30px;
+    line-height: 1.6;
+  }
+  .file-drop-zone {
+    border: 0.5px dashed var(--border2);
+    border-radius: 3px;
+    padding: 28px 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    margin-bottom: 16px;
+    position: relative;
+  }
+  .file-drop-zone:hover, .file-drop-zone.dragover {
+    background: rgba(78,203,128,0.06);
+    border-color: var(--accent);
+  }
+  .file-drop-zone input[type="file"] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+  .file-drop-icon {
+    font-family: var(--mono);
+    font-size: 20px;
+    color: var(--border2);
+    margin-bottom: 8px;
+  }
+  .file-drop-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+  }
+  .file-drop-name {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    margin-top: 6px;
+    min-height: 16px;
+  }
+  .import-error {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--danger);
+    margin-top: -8px;
+    margin-bottom: 10px;
+    min-height: 14px;
+  }
+
+  /* ── Toast ──────────────────────────────── */
+  .toast {
+    position: fixed;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%) translateY(12px);
+    background: #1a2e1f;
+    border: 0.5px solid var(--border2);
+    border-radius: 3px;
+    padding: 10px 20px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 0.08em;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s, transform 0.2s;
+    z-index: 1000;
+    white-space: nowrap;
+  }
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  /* ── Print button ───────────────────────── */
   @media print {
     @page { margin: 1.2cm 1.5cm; size: A4; }
     body { background: #fff !important; color: #111 !important; }
-    header, .print-btn, .add-btn, .job-del, #overlay { display: none !important; }
+    header, .util-btn, .add-btn, .job-del, #overlay, #import-overlay, .toast { display: none !important; }
     #sankey-wrap, #list-wrap { padding: 0 !important; }
     .print-header { display: block !important; }
     #sankey-area svg { width: 100% !important; max-width: 100%; }
@@ -314,7 +440,9 @@
   <div class="logo">// JOB SEARCH <span>TRACKER</span></div>
   <div class="header-right">
     <div class="stats" id="stats"></div>
-    <button class="print-btn" onclick="printReport()">Print Report</button>
+    <button class="util-btn" onclick="printReport()">Print</button>
+    <button class="util-btn" onclick="exportData()">↓ Export</button>
+    <button class="util-btn" onclick="openImportModal()">↑ Import</button>
     <button class="add-btn" onclick="openModal()">+ Add Application</button>
   </div>
 </header>
@@ -329,7 +457,7 @@
   <div id="jobs-list"></div>
 </div>
 
-<!-- Modal -->
+<!-- Job Modal -->
 <div class="overlay" id="overlay" style="display:none" onclick="if(event.target===this)closeModal()">
   <div class="modal">
     <div class="modal-title" id="modal-title">// New Application</div>
@@ -365,11 +493,41 @@
   </div>
 </div>
 
+<!-- Import Modal -->
+<div class="overlay" id="import-overlay" style="display:none" onclick="if(event.target===this)closeImportModal()">
+  <div class="import-modal">
+    <div class="modal-title">// Import Data</div>
+    <div class="import-info">
+      Load a previously exported <strong>job-tracker.json</strong> file.<br>
+      Choose whether to replace your current data or merge with it.
+    </div>
+
+    <div class="import-mode-row">
+      <button class="mode-btn active" id="mode-replace" onclick="setImportMode('replace')">Replace</button>
+      <button class="mode-btn" id="mode-merge" onclick="setImportMode('merge')">Merge</button>
+    </div>
+    <div class="mode-desc" id="mode-desc">Replaces all current data with the imported file. Your existing applications will be removed.</div>
+
+    <div class="file-drop-zone" id="drop-zone">
+      <input type="file" id="import-file-input" accept=".json,application/json" onchange="handleFileSelect(event)" />
+      <div class="file-drop-icon">{ }</div>
+      <div class="file-drop-label">Drop .json file here or click to browse</div>
+      <div class="file-drop-name" id="import-file-name"></div>
+    </div>
+    <div class="import-error" id="import-error"></div>
+
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeImportModal()">Cancel</button>
+      <button class="btn-save" id="import-confirm-btn" onclick="confirmImport()" disabled style="opacity:0.4;cursor:not-allowed">Load</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
 <script>
 // ── Data model ──────────────────────────────────────────────────────────────
-// Each job: { id, company, role, notes, stages: ['Applied','Interview',...], date }
-// stages is an ORDERED history — the job "flows" through all of them in the Sankey.
-
 const STAGES = ['Applied','Screening','Interview','Final Round','Offer','Accepted','Rejected','Withdrawn'];
 
 const STAGE_COLOR = {
@@ -383,11 +541,177 @@ const STAGE_COLOR = {
   'Withdrawn':   { bg:'rgba(122,155,128,0.13)', fg:'#7a9b80',  node:'#2a3c2e', link:'rgba(122,155,128,0.18)' },
 };
 
+const EXPORT_VERSION = 1;
 let jobs = JSON.parse(localStorage.getItem('jt2-jobs') || '[]');
 let editingId = null;
 
 function persist() { localStorage.setItem('jt2-jobs', JSON.stringify(jobs)); }
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+
+// ── Toast ───────────────────────────────────────────────────────────────────
+let toastTimer = null;
+function showToast(msg, duration = 2800) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), duration);
+}
+
+// ── Export ──────────────────────────────────────────────────────────────────
+function exportData() {
+  if (jobs.length === 0) {
+    showToast('No data to export yet.');
+    return;
+  }
+  const payload = {
+    _version: EXPORT_VERSION,
+    _exported: new Date().toISOString(),
+    _count: jobs.length,
+    jobs
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const date = new Date().toISOString().slice(0, 10);
+  a.href = url;
+  a.download = `job-tracker-${date}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast(`Exported ${jobs.length} application${jobs.length !== 1 ? 's' : ''}`);
+}
+
+// ── Import ──────────────────────────────────────────────────────────────────
+let importMode = 'replace';
+let pendingImportJobs = null;
+
+const MODE_DESCS = {
+  replace: 'Replaces all current data with the imported file. Your existing applications will be removed.',
+  merge: 'Adds imported applications to your existing data. Duplicates (matching IDs) will be skipped.'
+};
+
+function openImportModal() {
+  pendingImportJobs = null;
+  importMode = 'replace';
+  document.getElementById('mode-replace').classList.add('active');
+  document.getElementById('mode-merge').classList.remove('active');
+  document.getElementById('mode-desc').textContent = MODE_DESCS.replace;
+  document.getElementById('import-file-name').textContent = '';
+  document.getElementById('import-error').textContent = '';
+  document.getElementById('import-file-input').value = '';
+  setImportConfirmBtn(false);
+  document.getElementById('import-overlay').style.display = 'flex';
+}
+
+function closeImportModal() {
+  document.getElementById('import-overlay').style.display = 'none';
+  pendingImportJobs = null;
+}
+
+function setImportMode(mode) {
+  importMode = mode;
+  document.getElementById('mode-replace').classList.toggle('active', mode === 'replace');
+  document.getElementById('mode-merge').classList.toggle('active', mode === 'merge');
+  document.getElementById('mode-desc').textContent = MODE_DESCS[mode];
+}
+
+function setImportConfirmBtn(enabled) {
+  const btn = document.getElementById('import-confirm-btn');
+  btn.disabled = !enabled;
+  btn.style.opacity = enabled ? '1' : '0.4';
+  btn.style.cursor = enabled ? 'pointer' : 'not-allowed';
+}
+
+function handleFileSelect(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  readImportFile(file);
+}
+
+// Drag-and-drop support
+const dropZone = document.getElementById('drop-zone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file) readImportFile(file);
+});
+
+function readImportFile(file) {
+  document.getElementById('import-error').textContent = '';
+  document.getElementById('import-file-name').textContent = '';
+  pendingImportJobs = null;
+  setImportConfirmBtn(false);
+
+  if (!file.name.endsWith('.json') && file.type !== 'application/json') {
+    document.getElementById('import-error').textContent = 'File must be a .json file.';
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      const parsed = JSON.parse(ev.target.result);
+      let importedJobs;
+
+      // Support both the versioned export format and a bare array
+      if (Array.isArray(parsed)) {
+        importedJobs = parsed;
+      } else if (parsed && Array.isArray(parsed.jobs)) {
+        importedJobs = parsed.jobs;
+      } else {
+        throw new Error('Unrecognized format');
+      }
+
+      // Basic shape validation
+      const valid = importedJobs.every(j =>
+        j && typeof j.id === 'string' &&
+        typeof j.company === 'string' &&
+        Array.isArray(j.stages) && j.stages.length > 0
+      );
+      if (!valid) throw new Error('Some records are missing required fields (id, company, stages)');
+
+      pendingImportJobs = importedJobs;
+      document.getElementById('import-file-name').textContent = `✓ ${file.name} · ${importedJobs.length} application${importedJobs.length !== 1 ? 's' : ''}`;
+      setImportConfirmBtn(true);
+    } catch (err) {
+      document.getElementById('import-error').textContent = `Invalid file: ${err.message}.`;
+    }
+  };
+  reader.onerror = () => {
+    document.getElementById('import-error').textContent = 'Could not read file.';
+  };
+  reader.readAsText(file);
+}
+
+function confirmImport() {
+  if (!pendingImportJobs) return;
+
+  if (importMode === 'replace') {
+    jobs = pendingImportJobs;
+    persist();
+    render();
+    closeImportModal();
+    showToast(`Loaded ${jobs.length} application${jobs.length !== 1 ? 's' : ''} (replaced)`);
+  } else {
+    // Merge: skip any whose ID already exists
+    const existingIds = new Set(jobs.map(j => j.id));
+    const newJobs = pendingImportJobs.filter(j => !existingIds.has(j.id));
+    jobs = [...jobs, ...newJobs];
+    persist();
+    render();
+    closeImportModal();
+    const skipped = pendingImportJobs.length - newJobs.length;
+    const msg = skipped > 0
+      ? `Merged ${newJobs.length} new · ${skipped} duplicate${skipped !== 1 ? 's' : ''} skipped`
+      : `Merged ${newJobs.length} application${newJobs.length !== 1 ? 's' : ''}`;
+    showToast(msg);
+  }
+}
 
 // ── Modal ───────────────────────────────────────────────────────────────────
 function openModal(id) {
@@ -433,7 +757,6 @@ function renderStageChips(stages) {
 }
 
 function populateAdvanceSelect(currentStages) {
-  const last = currentStages[currentStages.length - 1];
   const remaining = STAGES.filter(s => !currentStages.includes(s));
   const sel = document.getElementById('advance-select');
   sel.innerHTML = remaining.map(s => `<option value="${s}">${s}</option>`).join('');
@@ -453,7 +776,7 @@ function advanceStage() {
 function removeStage(idx) {
   if (!editingId) return;
   const job = jobs.find(j => j.id === editingId);
-  if (job.stages.length <= 1) return; // must keep at least one
+  if (job.stages.length <= 1) return;
   job.stages.splice(idx, 1);
   persist();
   renderStageChips(job.stages);
@@ -486,11 +809,10 @@ function deleteJob(id, e) {
   render();
 }
 
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); closeImportModal(); } });
 
 // ── Sankey ──────────────────────────────────────────────────────────────────
 function buildSankeyData() {
-  // Always show Applied; collect all stages present across jobs
   const nodeSet = new Set(['Applied']);
   const linkMap = {};
 
@@ -502,10 +824,7 @@ function buildSankeyData() {
     }
   });
 
-  // All active stage names in STAGES order
   const allNames = STAGES.filter(s => nodeSet.has(s));
-
-  // Which names appear in at least one link (source or target)?
   const linkedNames = new Set();
   Object.keys(linkMap).forEach(key => {
     const [src, tgt] = key.split('|||');
@@ -513,17 +832,13 @@ function buildSankeyData() {
     linkedNames.add(tgt);
   });
 
-  // Nodes passed to d3-sankey: only those with links
   const sankeyNames = allNames.filter(s => linkedNames.has(s));
   const nodeIndex = Object.fromEntries(sankeyNames.map((s,i) => [s,i]));
   const sankeyNodes = sankeyNames.map(s => ({ name: s }));
-
   const links = Object.entries(linkMap).map(([key, value]) => {
     const [src, tgt] = key.split('|||');
     return { source: nodeIndex[src], target: nodeIndex[tgt], value };
   });
-
-  // Orphan nodes: present in data but no links (drawn manually outside d3-sankey)
   const orphanNames = allNames.filter(s => !linkedNames.has(s));
 
   return { sankeyNodes, links, orphanNames, allNames };
@@ -531,7 +846,6 @@ function buildSankeyData() {
 
 function drawSankey() {
   const area = document.getElementById('sankey-area');
-
   if (jobs.length === 0) {
     area.innerHTML = '<div class="sankey-empty">Add applications to see your pipeline flow.</div>';
     return;
@@ -551,7 +865,6 @@ function drawSankey() {
 
   const { sankeyNodes, links, orphanNames, allNames } = buildSankeyData();
 
-  // Column positions: divide the drawable width evenly across all active stage columns
   const numCols = Math.max(1, allNames.length);
   const drawW = W - PAD_L - PAD_R;
   const colX = name => {
@@ -560,9 +873,6 @@ function drawSankey() {
     return PAD_L + (idx / (numCols - 1)) * drawW;
   };
 
-  // ── Draw orphan nodes manually ──────────────────────────────────────────
-  // These are nodes with no links (e.g. Applied when no app has advanced).
-  // We position them at their correct column x and size them by job count.
   if (orphanNames.length > 0) {
     const totalJobs = jobs.length || 1;
     const maxBarH = H - LABEL_H - 8;
@@ -574,60 +884,41 @@ function drawSankey() {
       const y = LABEL_H + Math.round((maxBarH - barH) / 2);
       const c = STAGE_COLOR[name];
 
-      svg.append('rect')
-        .attr('x', x).attr('y', y)
-        .attr('width', NODE_W).attr('height', barH)
-        .attr('rx', 2)
-        .attr('fill', c?.node || '#2a5c38')
-        .attr('stroke', c?.fg || '#4ecb80')
-        .attr('stroke-width', 0.5);
+      svg.append('rect').attr('x', x).attr('y', y)
+        .attr('width', NODE_W).attr('height', barH).attr('rx', 2)
+        .attr('fill', c?.node || '#2a5c38').attr('stroke', c?.fg || '#4ecb80').attr('stroke-width', 0.5);
 
       const labelX = Math.max(PAD_L, Math.min(W - PAD_R, x + NODE_W / 2));
-      svg.append('text')
-        .attr('x', labelX).attr('y', y - 6)
+      svg.append('text').attr('x', labelX).attr('y', y - 6)
         .attr('text-anchor', x < W / 2 ? 'start' : 'end')
-        .attr('font-family', "'Share Tech Mono', monospace")
-        .attr('font-size', 10)
-        .attr('fill', c?.fg || '#4ecb80')
-        .text(`${name} (${count})`);
+        .attr('font-family', "'Share Tech Mono', monospace").attr('font-size', 10)
+        .attr('fill', c?.fg || '#4ecb80').text(`${name} (${count})`);
     });
   }
 
-  // ── D3-sankey for linked nodes ──────────────────────────────────────────
   if (links.length > 0) {
     const colMap = Object.fromEntries(allNames.map((s,i) => [s, i]));
-
     const sankey = d3.sankey()
-      .nodeWidth(NODE_W)
-      .nodePadding(18)
+      .nodeWidth(NODE_W).nodePadding(18)
       .nodeAlign(node => colMap[node.name] ?? 0)
       .extent([[PAD_L, LABEL_H], [W - PAD_R, H]]);
 
     const { nodes: sNodes, links: sLinks } = sankey(JSON.parse(JSON.stringify({ nodes: sankeyNodes, links })));
 
-    svg.append('g').selectAll('path')
-      .data(sLinks)
-      .join('path')
+    svg.append('g').selectAll('path').data(sLinks).join('path')
       .attr('d', d3.sankeyLinkHorizontal())
       .attr('stroke-width', d => Math.max(2, d.width))
       .attr('stroke', d => STAGE_COLOR[d.source.name]?.link || 'rgba(78,203,128,0.18)')
-      .attr('fill', 'none')
-      .attr('opacity', 0.75);
+      .attr('fill', 'none').attr('opacity', 0.75);
 
-    svg.append('g').selectAll('rect')
-      .data(sNodes)
-      .join('rect')
+    svg.append('g').selectAll('rect').data(sNodes).join('rect')
       .attr('x', d => d.x0).attr('y', d => d.y0)
-      .attr('width', d => d.x1 - d.x0)
-      .attr('height', d => Math.max(4, d.y1 - d.y0))
+      .attr('width', d => d.x1 - d.x0).attr('height', d => Math.max(4, d.y1 - d.y0))
       .attr('rx', 2)
       .attr('fill', d => STAGE_COLOR[d.name]?.node || '#2a5c38')
-      .attr('stroke', d => STAGE_COLOR[d.name]?.fg || '#4ecb80')
-      .attr('stroke-width', 0.5);
+      .attr('stroke', d => STAGE_COLOR[d.name]?.fg || '#4ecb80').attr('stroke-width', 0.5);
 
-    svg.append('g').selectAll('text')
-      .data(sNodes)
-      .join('text')
+    svg.append('g').selectAll('text').data(sNodes).join('text')
       .attr('x', d => {
         const cx = (d.x0 + d.x1) / 2;
         return Math.max(PAD_L, Math.min(W - PAD_R / 2, cx));
@@ -639,8 +930,7 @@ function drawSankey() {
         if (cx > W * 0.8) return 'end';
         return 'middle';
       })
-      .attr('font-family', "'Share Tech Mono', monospace")
-      .attr('font-size', 10)
+      .attr('font-family', "'Share Tech Mono', monospace").attr('font-size', 10)
       .attr('fill', d => STAGE_COLOR[d.name]?.fg || '#4ecb80')
       .text(d => {
         const count = jobs.filter(j => j.stages.includes(d.name)).length;
