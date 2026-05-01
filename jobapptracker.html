@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Job Search Tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3-sankey@0.12.3/dist/d3-sankey.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Syne:wght@400;500;700&display=swap');
+
+  :root {
+    --bg:        #0d0f0e;
+    --surface:   #111411;
+    --surface2:  #161a16;
+    --border:    rgba(78,203,128,0.13);
+    --border2:   rgba(78,203,128,0.25);
+    --accent:    #4ecb80;
+    --accent-d:  rgba(78,203,128,0.10);
+    --text:      #cce3d2;
+    --muted:     #618069;
+    --danger:    #e05c5c;
+    --mono: 'Share Tech Mono', monospace;
+    --sans: 'Syne', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+  }
+
+  /* ── Header ────────────────────────────── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 28px;
+    border-bottom: 0.5px solid var(--border);
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    z-index: 10;
+  }
+  .logo {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  .logo span { color: var(--muted); }
+  .header-right { display: flex; align-items: center; gap: 24px; }
+  .stats { display: flex; gap: 20px; }
+  .stat { text-align: right; }
+  .stat-val { font-family: var(--mono); font-size: 20px; line-height: 1; }
+  .stat-lbl { font-size: 9px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-top: 2px; }
+  .add-btn {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    background: var(--accent-d);
+    border: 0.5px solid var(--border2);
+    padding: 7px 16px;
+    border-radius: 3px;
+    cursor: pointer;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    transition: background 0.15s;
+  }
+  .add-btn:hover { background: rgba(78,203,128,0.18); }
+
+  /* ── Sankey ────────────────────────────── */
+  #sankey-wrap {
+    padding: 28px 28px 0;
+  }
+  #sankey-wrap h2 {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+  #sankey-svg { width: 100%; display: block; }
+  .sankey-empty {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    text-align: center;
+    padding: 40px;
+    border: 0.5px dashed var(--border);
+    border-radius: 4px;
+  }
+
+  /* ── Jobs table ────────────────────────── */
+  #list-wrap { padding: 24px 28px 48px; }
+  #list-wrap h2 {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding-bottom: 10px;
+    border-bottom: 0.5px solid var(--border);
+    margin-bottom: 4px;
+  }
+  .job-row {
+    display: grid;
+    grid-template-columns: 160px 160px minmax(0,1fr) 80px 20px;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 8px;
+    border-bottom: 0.5px solid rgba(78,203,128,0.05);
+    cursor: pointer;
+    border-radius: 3px;
+    transition: background 0.1s;
+  }
+  .job-row:hover { background: rgba(78,203,128,0.04); }
+  .job-company { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .job-role { font-size: 12px; color: var(--muted); font-family: var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .job-history { display: flex; align-items: center; gap: 4px; flex-wrap: nowrap; overflow: hidden; }
+  .stage-crumb {
+    font-family: var(--mono);
+    font-size: 9px;
+    padding: 2px 7px;
+    border-radius: 2px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .stage-arrow { font-size: 9px; color: var(--muted); flex-shrink: 0; }
+  .job-date { font-family: var(--mono); font-size: 10px; color: var(--muted); white-space: nowrap; }
+  .job-del {
+    font-size: 10px; color: var(--muted); background: none; border: none;
+    cursor: pointer; padding: 0 4px; opacity: 0; font-family: var(--mono);
+    transition: opacity 0.1s;
+  }
+  .job-row:hover .job-del { opacity: 1; }
+  .job-del:hover { color: var(--danger); }
+  .list-empty {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    text-align: center;
+    padding: 48px 0;
+  }
+
+  /* ── Modal ─────────────────────────────── */
+  .overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.72);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 200;
+  }
+  .modal {
+    background: #131a14;
+    border: 0.5px solid var(--border2);
+    border-radius: 4px;
+    padding: 26px;
+    width: 360px;
+    max-width: 92vw;
+  }
+  .modal-title {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--accent);
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+  .field { margin-bottom: 14px; }
+  .field label {
+    display: block;
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .field input, .field select, .field textarea {
+    width: 100%;
+    background: #0d0f0e;
+    border: 0.5px solid var(--border);
+    border-radius: 3px;
+    padding: 8px 10px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--border2); }
+  .field select option { background: #131a14; }
+  .field textarea { resize: vertical; min-height: 60px; line-height: 1.5; }
+
+  /* Stage history chips in modal */
+  .stage-history-row {
+    display: flex; align-items: center; gap: 6px;
+    flex-wrap: wrap;
+    background: #0d0f0e;
+    border: 0.5px solid var(--border);
+    border-radius: 3px;
+    padding: 8px 10px;
+    min-height: 38px;
+  }
+  .sh-chip {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 2px;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .sh-chip button {
+    background: none; border: none; cursor: pointer;
+    font-size: 10px; padding: 0; line-height: 1;
+    color: inherit; opacity: 0.6;
+  }
+  .sh-chip button:hover { opacity: 1; }
+  .sh-arrow { font-size: 9px; color: var(--muted); }
+
+  .advance-row { display: flex; gap: 8px; margin-top: 8px; }
+  .advance-row select {
+    flex: 1;
+    background: #0d0f0e;
+    border: 0.5px solid var(--border);
+    border-radius: 3px;
+    padding: 7px 10px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    outline: none;
+  }
+  .advance-btn {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    background: var(--accent-d);
+    border: 0.5px solid var(--border2);
+    padding: 7px 14px;
+    border-radius: 3px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .advance-btn:hover { background: rgba(78,203,128,0.18); }
+
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 22px; }
+  .btn-cancel {
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
+    background: none; border: 0.5px solid rgba(78,203,128,0.1);
+    padding: 7px 14px; border-radius: 3px; cursor: pointer;
+  }
+  .btn-cancel:hover { color: var(--text); }
+  .btn-save {
+    font-family: var(--mono); font-size: 11px; color: #0a0f0b;
+    background: var(--accent); border: none;
+    padding: 7px 18px; border-radius: 3px; cursor: pointer; font-weight: 700;
+  }
+  .btn-save:hover { background: #5fd88f; }
+
+  /* ── Print button ───────────────────────── */
+  .print-btn {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    background: none;
+    border: 0.5px solid rgba(78,203,128,0.1);
+    padding: 7px 14px;
+    border-radius: 3px;
+    cursor: pointer;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .print-btn:hover { color: var(--text); border-color: var(--border2); }
+
+  @media print {
+    @page { margin: 1.2cm 1.5cm; size: A4; }
+    body { background: #fff !important; color: #111 !important; }
+    header, .print-btn, .add-btn, .job-del, #overlay { display: none !important; }
+    #sankey-wrap, #list-wrap { padding: 0 !important; }
+    .print-header { display: block !important; }
+    #sankey-area svg { width: 100% !important; max-width: 100%; }
+    .job-row { border-bottom: 0.5px solid #ccc !important; background: none !important; }
+    .job-company { color: #111 !important; }
+    .job-role { color: #555 !important; }
+    .job-date { color: #666 !important; }
+    .stage-crumb { display: none !important; }
+    .stage-crumb-last { display: inline-block !important; border: 0.5px solid #aaa !important; background: #f0f0f0 !important; color: #333 !important; }
+    .stage-arrow { display: none !important; }
+    #list-wrap h2, #sankey-wrap h2 { color: #666 !important; border-color: #ccc !important; }
+    .print-stats { display: flex !important; }
+  }
+  .print-header { display: none; margin-bottom: 20px; border-bottom: 1px solid #ccc; padding-bottom: 12px; }
+  .print-header h1 { font-family: 'Share Tech Mono', monospace; font-size: 13px; letter-spacing: 0.1em; color: #111; text-transform: uppercase; margin-bottom: 4px; }
+  .print-header p { font-size: 10px; color: #888; font-family: 'Share Tech Mono', monospace; }
+  .print-stats { display: none; gap: 32px; margin: 16px 0 24px; border-top: 0.5px solid #ccc; border-bottom: 0.5px solid #ccc; padding: 12px 0; }
+  .print-stat-item { font-family: 'Share Tech Mono', monospace; font-size: 11px; }
+  .print-stat-item strong { display: block; font-size: 22px; color: #111; }
+  .print-stat-item span { font-size: 9px; color: #888; letter-spacing: 0.1em; text-transform: uppercase; }
+</style>
+</head>
+<body>
+
+<div class="print-header" id="print-header">
+  <h1>// Job Search Report</h1>
+  <p id="print-date"></p>
+</div>
+<div class="print-stats" id="print-stats"></div>
+<header>
+  <div class="logo">// JOB SEARCH <span>TRACKER</span></div>
+  <div class="header-right">
+    <div class="stats" id="stats"></div>
+    <button class="print-btn" onclick="printReport()">Print Report</button>
+    <button class="add-btn" onclick="openModal()">+ Add Application</button>
+  </div>
+</header>
+
+<div id="sankey-wrap">
+  <h2>Pipeline Flow</h2>
+  <div id="sankey-area"></div>
+</div>
+
+<div id="list-wrap">
+  <h2>Applications</h2>
+  <div id="jobs-list"></div>
+</div>
+
+<!-- Modal -->
+<div class="overlay" id="overlay" style="display:none" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-title" id="modal-title">// New Application</div>
+    <div class="field"><label>Company</label><input id="f-company" placeholder="Acme Corp" /></div>
+    <div class="field"><label>Role</label><input id="f-role" placeholder="Software Engineer" /></div>
+    <div class="field">
+      <label>Notes</label>
+      <textarea id="f-notes" placeholder="Recruiter name, referral, salary range..."></textarea>
+    </div>
+    <div id="stage-history-section" style="display:none">
+      <div class="field">
+        <label>Stage History</label>
+        <div class="stage-history-row" id="stage-chips"></div>
+      </div>
+      <div class="field">
+        <label>Advance to Stage</label>
+        <div class="advance-row">
+          <select id="advance-select"></select>
+          <button class="advance-btn" onclick="advanceStage()">+ Add Stage</button>
+        </div>
+      </div>
+    </div>
+    <div id="new-stage-section">
+      <div class="field">
+        <label>Starting Stage</label>
+        <select id="f-stage-new"></select>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-save" onclick="saveJob()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Data model ──────────────────────────────────────────────────────────────
+// Each job: { id, company, role, notes, stages: ['Applied','Interview',...], date }
+// stages is an ORDERED history — the job "flows" through all of them in the Sankey.
+
+const STAGES = ['Applied','Screening','Interview','Final Round','Offer','Accepted','Rejected','Withdrawn'];
+
+const STAGE_COLOR = {
+  'Applied':     { bg:'rgba(78,203,128,0.13)',  fg:'#4ecb80',  node:'#2a5c38', link:'rgba(78,203,128,0.18)' },
+  'Screening':   { bg:'rgba(78,180,203,0.13)',  fg:'#4ec8cb',  node:'#1e4d52', link:'rgba(78,180,203,0.18)' },
+  'Interview':   { bg:'rgba(180,140,255,0.13)', fg:'#b48cff',  node:'#4a3570', link:'rgba(180,140,255,0.18)' },
+  'Final Round': { bg:'rgba(255,200,80,0.13)',  fg:'#ffc850',  node:'#5c4a10', link:'rgba(255,200,80,0.18)' },
+  'Offer':       { bg:'rgba(80,200,255,0.13)',  fg:'#50c8ff',  node:'#0e4a5c', link:'rgba(80,200,255,0.18)' },
+  'Accepted':    { bg:'rgba(80,255,180,0.13)',  fg:'#50ffb4',  node:'#0e5c3c', link:'rgba(80,255,180,0.18)' },
+  'Rejected':    { bg:'rgba(224,92,92,0.13)',   fg:'#e05c5c',  node:'#5c1a1a', link:'rgba(224,92,92,0.18)' },
+  'Withdrawn':   { bg:'rgba(122,155,128,0.13)', fg:'#7a9b80',  node:'#2a3c2e', link:'rgba(122,155,128,0.18)' },
+};
+
+let jobs = JSON.parse(localStorage.getItem('jt2-jobs') || '[]');
+let editingId = null;
+
+function persist() { localStorage.setItem('jt2-jobs', JSON.stringify(jobs)); }
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+
+// ── Modal ───────────────────────────────────────────────────────────────────
+function openModal(id) {
+  editingId = id || null;
+  const job = id ? jobs.find(j => j.id === id) : null;
+
+  document.getElementById('modal-title').textContent = id ? '// Edit Application' : '// New Application';
+  document.getElementById('f-company').value = job ? job.company : '';
+  document.getElementById('f-role').value = job ? job.role : '';
+  document.getElementById('f-notes').value = job ? (job.notes || '') : '';
+
+  if (job) {
+    document.getElementById('stage-history-section').style.display = '';
+    document.getElementById('new-stage-section').style.display = 'none';
+    renderStageChips(job.stages);
+    populateAdvanceSelect(job.stages);
+  } else {
+    document.getElementById('stage-history-section').style.display = 'none';
+    document.getElementById('new-stage-section').style.display = '';
+    const sel = document.getElementById('f-stage-new');
+    sel.innerHTML = STAGES.map(s => `<option value="${s}">${s}</option>`).join('');
+  }
+
+  document.getElementById('overlay').style.display = 'flex';
+  setTimeout(() => document.getElementById('f-company').focus(), 50);
+}
+
+function closeModal() {
+  document.getElementById('overlay').style.display = 'none';
+  editingId = null;
+}
+
+function renderStageChips(stages) {
+  const el = document.getElementById('stage-chips');
+  el.innerHTML = stages.map((s, i) => {
+    const c = STAGE_COLOR[s];
+    const arrow = i < stages.length - 1 ? `<span class="sh-arrow">›</span>` : '';
+    return `<span class="sh-chip" style="background:${c.bg};color:${c.fg}">
+      ${s}
+      <button onclick="removeStage(${i})" title="Remove">✕</button>
+    </span>${arrow}`;
+  }).join('');
+}
+
+function populateAdvanceSelect(currentStages) {
+  const last = currentStages[currentStages.length - 1];
+  const remaining = STAGES.filter(s => !currentStages.includes(s));
+  const sel = document.getElementById('advance-select');
+  sel.innerHTML = remaining.map(s => `<option value="${s}">${s}</option>`).join('');
+}
+
+function advanceStage() {
+  if (!editingId) return;
+  const job = jobs.find(j => j.id === editingId);
+  const val = document.getElementById('advance-select').value;
+  if (!val || job.stages.includes(val)) return;
+  job.stages.push(val);
+  persist();
+  renderStageChips(job.stages);
+  populateAdvanceSelect(job.stages);
+}
+
+function removeStage(idx) {
+  if (!editingId) return;
+  const job = jobs.find(j => j.id === editingId);
+  if (job.stages.length <= 1) return; // must keep at least one
+  job.stages.splice(idx, 1);
+  persist();
+  renderStageChips(job.stages);
+  populateAdvanceSelect(job.stages);
+}
+
+function saveJob() {
+  const company = document.getElementById('f-company').value.trim();
+  const role = document.getElementById('f-role').value.trim();
+  const notes = document.getElementById('f-notes').value.trim();
+  if (!company) { document.getElementById('f-company').focus(); return; }
+
+  if (editingId) {
+    const j = jobs.find(j => j.id === editingId);
+    if (j) { j.company = company; j.role = role; j.notes = notes; }
+  } else {
+    const startStage = document.getElementById('f-stage-new').value;
+    jobs.push({ id: uid(), company, role, notes, stages: [startStage], date: new Date().toISOString().slice(0,10) });
+  }
+  persist();
+  closeModal();
+  render();
+}
+
+function deleteJob(id, e) {
+  e.stopPropagation();
+  if (!confirm('Remove this application?')) return;
+  jobs = jobs.filter(j => j.id !== id);
+  persist();
+  render();
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+// ── Sankey ──────────────────────────────────────────────────────────────────
+function buildSankeyData() {
+  // Always show Applied; collect all stages present across jobs
+  const nodeSet = new Set(['Applied']);
+  const linkMap = {};
+
+  jobs.forEach(job => {
+    job.stages.forEach(s => nodeSet.add(s));
+    for (let i = 0; i < job.stages.length - 1; i++) {
+      const key = `${job.stages[i]}|||${job.stages[i+1]}`;
+      linkMap[key] = (linkMap[key] || 0) + 1;
+    }
+  });
+
+  // All active stage names in STAGES order
+  const allNames = STAGES.filter(s => nodeSet.has(s));
+
+  // Which names appear in at least one link (source or target)?
+  const linkedNames = new Set();
+  Object.keys(linkMap).forEach(key => {
+    const [src, tgt] = key.split('|||');
+    linkedNames.add(src);
+    linkedNames.add(tgt);
+  });
+
+  // Nodes passed to d3-sankey: only those with links
+  const sankeyNames = allNames.filter(s => linkedNames.has(s));
+  const nodeIndex = Object.fromEntries(sankeyNames.map((s,i) => [s,i]));
+  const sankeyNodes = sankeyNames.map(s => ({ name: s }));
+
+  const links = Object.entries(linkMap).map(([key, value]) => {
+    const [src, tgt] = key.split('|||');
+    return { source: nodeIndex[src], target: nodeIndex[tgt], value };
+  });
+
+  // Orphan nodes: present in data but no links (drawn manually outside d3-sankey)
+  const orphanNames = allNames.filter(s => !linkedNames.has(s));
+
+  return { sankeyNodes, links, orphanNames, allNames };
+}
+
+function drawSankey() {
+  const area = document.getElementById('sankey-area');
+
+  if (jobs.length === 0) {
+    area.innerHTML = '<div class="sankey-empty">Add applications to see your pipeline flow.</div>';
+    return;
+  }
+
+  const W = area.clientWidth || 800;
+  const activeStages = new Set(['Applied', ...jobs.flatMap(j => j.stages)]);
+  const H = Math.min(520, Math.max(200, activeStages.size * 52));
+  const LABEL_H = 32;
+  const NODE_W = 20;
+  const PAD_L = 80, PAD_R = 140;
+
+  area.innerHTML = '';
+  const svg = d3.select(area).append('svg')
+    .attr('width', W).attr('height', H + LABEL_H)
+    .attr('viewBox', `0 0 ${W} ${H + LABEL_H}`);
+
+  const { sankeyNodes, links, orphanNames, allNames } = buildSankeyData();
+
+  // Column positions: divide the drawable width evenly across all active stage columns
+  const numCols = Math.max(1, allNames.length);
+  const drawW = W - PAD_L - PAD_R;
+  const colX = name => {
+    const idx = allNames.indexOf(name);
+    if (numCols === 1) return PAD_L;
+    return PAD_L + (idx / (numCols - 1)) * drawW;
+  };
+
+  // ── Draw orphan nodes manually ──────────────────────────────────────────
+  // These are nodes with no links (e.g. Applied when no app has advanced).
+  // We position them at their correct column x and size them by job count.
+  if (orphanNames.length > 0) {
+    const totalJobs = jobs.length || 1;
+    const maxBarH = H - LABEL_H - 8;
+    orphanNames.forEach(name => {
+      const count = jobs.filter(j => j.stages.includes(name)).length;
+      if (count === 0) return;
+      const barH = Math.max(6, Math.round((count / totalJobs) * maxBarH));
+      const x = colX(name);
+      const y = LABEL_H + Math.round((maxBarH - barH) / 2);
+      const c = STAGE_COLOR[name];
+
+      svg.append('rect')
+        .attr('x', x).attr('y', y)
+        .attr('width', NODE_W).attr('height', barH)
+        .attr('rx', 2)
+        .attr('fill', c?.node || '#2a5c38')
+        .attr('stroke', c?.fg || '#4ecb80')
+        .attr('stroke-width', 0.5);
+
+      const labelX = Math.max(PAD_L, Math.min(W - PAD_R, x + NODE_W / 2));
+      svg.append('text')
+        .attr('x', labelX).attr('y', y - 6)
+        .attr('text-anchor', x < W / 2 ? 'start' : 'end')
+        .attr('font-family', "'Share Tech Mono', monospace")
+        .attr('font-size', 10)
+        .attr('fill', c?.fg || '#4ecb80')
+        .text(`${name} (${count})`);
+    });
+  }
+
+  // ── D3-sankey for linked nodes ──────────────────────────────────────────
+  if (links.length > 0) {
+    const colMap = Object.fromEntries(allNames.map((s,i) => [s, i]));
+
+    const sankey = d3.sankey()
+      .nodeWidth(NODE_W)
+      .nodePadding(18)
+      .nodeAlign(node => colMap[node.name] ?? 0)
+      .extent([[PAD_L, LABEL_H], [W - PAD_R, H]]);
+
+    const { nodes: sNodes, links: sLinks } = sankey(JSON.parse(JSON.stringify({ nodes: sankeyNodes, links })));
+
+    svg.append('g').selectAll('path')
+      .data(sLinks)
+      .join('path')
+      .attr('d', d3.sankeyLinkHorizontal())
+      .attr('stroke-width', d => Math.max(2, d.width))
+      .attr('stroke', d => STAGE_COLOR[d.source.name]?.link || 'rgba(78,203,128,0.18)')
+      .attr('fill', 'none')
+      .attr('opacity', 0.75);
+
+    svg.append('g').selectAll('rect')
+      .data(sNodes)
+      .join('rect')
+      .attr('x', d => d.x0).attr('y', d => d.y0)
+      .attr('width', d => d.x1 - d.x0)
+      .attr('height', d => Math.max(4, d.y1 - d.y0))
+      .attr('rx', 2)
+      .attr('fill', d => STAGE_COLOR[d.name]?.node || '#2a5c38')
+      .attr('stroke', d => STAGE_COLOR[d.name]?.fg || '#4ecb80')
+      .attr('stroke-width', 0.5);
+
+    svg.append('g').selectAll('text')
+      .data(sNodes)
+      .join('text')
+      .attr('x', d => {
+        const cx = (d.x0 + d.x1) / 2;
+        return Math.max(PAD_L, Math.min(W - PAD_R / 2, cx));
+      })
+      .attr('y', d => d.y0 - 6)
+      .attr('text-anchor', d => {
+        const cx = (d.x0 + d.x1) / 2;
+        if (cx < W * 0.2) return 'start';
+        if (cx > W * 0.8) return 'end';
+        return 'middle';
+      })
+      .attr('font-family', "'Share Tech Mono', monospace")
+      .attr('font-size', 10)
+      .attr('fill', d => STAGE_COLOR[d.name]?.fg || '#4ecb80')
+      .text(d => {
+        const count = jobs.filter(j => j.stages.includes(d.name)).length;
+        return `${d.name} (${count})`;
+      });
+  }
+}
+
+// ── Stats ───────────────────────────────────────────────────────────────────
+function renderStats() {
+  const total = jobs.length;
+  const active = jobs.filter(j => {
+    const last = j.stages[j.stages.length - 1];
+    return !['Rejected','Withdrawn','Accepted'].includes(last);
+  }).length;
+  const offers = jobs.filter(j => j.stages.includes('Offer') || j.stages.includes('Accepted')).length;
+
+  document.getElementById('stats').innerHTML = `
+    <div class="stat"><div class="stat-val">${total}</div><div class="stat-lbl">Total</div></div>
+    <div class="stat"><div class="stat-val">${active}</div><div class="stat-lbl">Active</div></div>
+    <div class="stat"><div class="stat-val">${offers}</div><div class="stat-lbl">Offers</div></div>
+  `;
+}
+
+// ── Jobs list ───────────────────────────────────────────────────────────────
+function renderList() {
+  const el = document.getElementById('jobs-list');
+  if (jobs.length === 0) {
+    el.innerHTML = '<div class="list-empty">No applications yet — hit + Add Application to start.</div>';
+    return;
+  }
+  const sorted = [...jobs].sort((a,b) => b.date.localeCompare(a.date));
+  el.innerHTML = sorted.map(j => {
+    const crumbs = j.stages.map((s,i) => {
+      const c = STAGE_COLOR[s];
+      const isLast = i === j.stages.length - 1;
+      const arrow = !isLast ? `<span class="stage-arrow">›</span>` : '';
+      return `<span class="stage-crumb${isLast ? ' stage-crumb-last' : ''}" style="background:${c.bg};color:${c.fg}">${s}</span>${arrow}`;
+    }).join('');
+    return `<div class="job-row" onclick="openModal('${j.id}')">
+      <span class="job-company">${j.company}</span>
+      <span class="job-role">${j.role || '—'}</span>
+      <span class="job-history">${crumbs}</span>
+      <span class="job-date">${j.date}</span>
+      <button class="job-del" onclick="deleteJob('${j.id}',event)">✕</button>
+    </div>`;
+  }).join('');
+}
+
+// ── Render ──────────────────────────────────────────────────────────────────
+function render() {
+  renderStats();
+  drawSankey();
+  renderList();
+}
+
+function printReport() {
+  const total = jobs.length;
+  const active = jobs.filter(j => !['Rejected','Withdrawn','Accepted'].includes(j.stages[j.stages.length-1])).length;
+  const offers = jobs.filter(j => j.stages.includes('Offer') || j.stages.includes('Accepted')).length;
+  const rejected = jobs.filter(j => j.stages.includes('Rejected')).length;
+  const rate = total ? Math.round((jobs.filter(j => j.stages.length > 1).length / total) * 100) : 0;
+
+  document.getElementById('print-date').textContent = `Generated ${new Date().toLocaleDateString('en-US', {year:'numeric',month:'long',day:'numeric'})}`;
+  document.getElementById('print-stats').innerHTML = `
+    <div class="print-stat-item"><strong>${total}</strong><span>Applications</span></div>
+    <div class="print-stat-item"><strong>${active}</strong><span>Active</span></div>
+    <div class="print-stat-item"><strong>${offers}</strong><span>Offers</span></div>
+    <div class="print-stat-item"><strong>${rejected}</strong><span>Rejected</span></div>
+    <div class="print-stat-item"><strong>${rate}%</strong><span>Response Rate</span></div>
+  `;
+  window.print();
+}
+
+window.addEventListener('resize', drawSankey);
+render();
+</script>
+</body>
+</html>
