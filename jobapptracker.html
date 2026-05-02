@@ -592,7 +592,7 @@
 
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeImportModal()">Cancel</button>
-      <button class="btn-save" id="import-confirm-btn" onclick="confirmImport()" disabled style="opacity:0.4;cursor:not-allowed">Load</button>
+      <button class="btn-save" id="import-confirm-btn" onclick="confirmImport(event)" disabled style="opacity:0.4;cursor:not-allowed">Load</button>
     </div>
   </div>
 </div>
@@ -790,7 +790,8 @@ function readImportFile(file) {
   reader.readAsText(file);
 }
 
-function confirmImport() {
+function confirmImport(e) {
+  if (e) e.stopPropagation();
   if (!pendingImportJobs) return;
 
   let toastMsg;
@@ -808,17 +809,14 @@ function confirmImport() {
   }
 
   persist();
-  console.log('[import] jobs array now:', jobs.length, 'entries');
   closeImportModal();
-  console.log('[import] modal closed');
-  requestAnimationFrame(() => {
-    const area = document.getElementById('sankey-area');
-    console.log('[import] rAF fired — sankey-area clientWidth:', area.clientWidth);
+  // Double rAF: first frame commits the modal removal to the DOM,
+  // second frame fires after the browser has actually painted it,
+  // so sankey-area reports its real clientWidth when we measure.
+  requestAnimationFrame(() => requestAnimationFrame(() => {
     render();
-    console.log('[import] render() complete');
     showToast(toastMsg);
-    console.log('[import] toast fired:', toastMsg);
-  });
+  }));
 }
 
 // ── Modal ───────────────────────────────────────────────────────────────────
@@ -934,150 +932,147 @@ function buildSankeyData() {
     }
   });
 
-  const allNames = STAGES.filter(s => stageCount[s] > 0);
-
-  const linkedSources = new Set();
-  const linkedTargets = new Set();
+  // For each stage, how many jobs flowed OUT via a real link
+  const outflow = {};
   Object.keys(linkMap).forEach(key => {
-    const [src, tgt] = key.split('|||');
-    linkedSources.add(src); linkedTargets.add(tgt);
+    const [src] = key.split('|||');
+    outflow[src] = (outflow[src] || 0) + linkMap[key];
   });
 
-  // Nodes that participate in at least one real link
-  const linkedNames = allNames.filter(s => linkedSources.has(s) || linkedTargets.has(s));
-  // Nodes with no links at all — drawn manually
-  const orphanNames = allNames.filter(s => !linkedSources.has(s) && !linkedTargets.has(s));
+  const activeStageNames = STAGES.filter(s => stageCount[s] > 0);
 
-  const nodeIndex = Object.fromEntries(linkedNames.map((s, i) => [s, i]));
-  const sankeyNodes = linkedNames.map(s => ({ name: s }));
-  const links = Object.entries(linkMap).map(([key, value]) => {
+  // Add a synthetic "__pending__" node that absorbs jobs still sitting at
+  // each stage. This makes d3-sankey see the full volume at every node
+  // while keeping flow conservation intact.
+  const PENDING = '__pending__';
+  const allNodeNames = [...activeStageNames, PENDING];
+  const nodeIndex = Object.fromEntries(allNodeNames.map((s, i) => [s, i]));
+
+  const links = [];
+
+  // Real stage-to-stage transitions
+  Object.entries(linkMap).forEach(([key, value]) => {
     const [src, tgt] = key.split('|||');
-    return { source: nodeIndex[src], target: nodeIndex[tgt], value };
+    links.push({ source: nodeIndex[src], target: nodeIndex[tgt], value });
   });
 
-  return { sankeyNodes, links, allNames, linkedNames, orphanNames, stageCount };
+  // Synthetic "still here" flows into the pending node
+  activeStageNames.forEach(name => {
+    const retained = (stageCount[name] || 0) - (outflow[name] || 0);
+    if (retained > 0) {
+      links.push({ source: nodeIndex[name], target: nodeIndex[PENDING], value: retained, synthetic: true });
+    }
+  });
+
+  return { activeStageNames, allNodeNames, links, stageCount, nodeIndex };
 }
 
 function drawSankey() {
   const area = document.getElementById('sankey-area');
+
   if (jobs.length === 0) {
     area.innerHTML = '<div class="sankey-empty">Add applications to see your pipeline flow.</div>';
     return;
   }
 
+  const { activeStageNames, allNodeNames, links, stageCount } = buildSankeyData();
+  const PENDING = '__pending__';
+  const numCols = activeStageNames.length;
+
   const W = area.clientWidth || 800;
-  const activeStages = STAGES.filter(s => jobs.some(j => j.stages.includes(s)));
-  const H = Math.min(600, Math.max(220, activeStages.length * 60));
-  const LABEL_H = 32;
-  const NODE_W = 20;
-  const PAD_L = 80, PAD_R = 140;
-  const drawW = W - PAD_L - PAD_R;
+  const H = Math.min(500, Math.max(180, numCols * 55));
+  const LABEL_H = 28;
+  const NODE_W = 18;
+  const PAD_L = 16, PAD_R = 16;
 
   area.innerHTML = '';
   const svg = d3.select(area).append('svg')
-    .attr('width', W).attr('height', H + LABEL_H)
+    .attr('width', W)
+    .attr('height', H + LABEL_H)
     .attr('viewBox', `0 0 ${W} ${H + LABEL_H}`);
 
-  const { sankeyNodes, links, allNames, linkedNames, orphanNames, stageCount } = buildSankeyData();
+  const colX = i => numCols === 1
+    ? PAD_L
+    : PAD_L + i * (W - PAD_L - PAD_R - NODE_W) / (numCols - 1);
 
-  // X position for a stage based on its slot in the full ordered list
-  const numCols = allNames.length;
-  const colX = name => {
-    const idx = allNames.indexOf(name);
-    return numCols === 1 ? PAD_L : PAD_L + (idx / (numCols - 1)) * drawW;
-  };
+  const pendingX = W + 500;
 
-  // ── d3-sankey for linked nodes ──────────────────────────────────────────
-  if (links.length > 0) {
-    const colMap = Object.fromEntries(allNames.map((s, i) => [s, i]));
+  const sankey = d3.sankey()
+    .nodeId(d => d.name)
+    .nodeWidth(NODE_W)
+    .nodePadding(10)
+    .nodeSort(null)
+    .extent([[PAD_L, LABEL_H], [W - PAD_R, H + LABEL_H - 4]]);
 
-    const sankey = d3.sankey()
-      .nodeWidth(NODE_W)
-      .nodePadding(14)
-      .nodeAlign(node => colMap[node.name] ?? 0)
-      .extent([[PAD_L, LABEL_H], [W - PAD_R, H]]);
+  const freshNodes = allNodeNames.map(s => ({ name: s }));
+  const freshLinks = links.map(l => ({
+    source: typeof l.source === 'object' ? l.source.name : allNodeNames[l.source],
+    target: typeof l.target === 'object' ? l.target.name : allNodeNames[l.target],
+    value: l.value,
+    synthetic: l.synthetic || false
+  }));
 
-    // Always pass fresh plain objects — never reuse mutated ones
-    const graphInput = {
-      nodes: linkedNames.map(s => ({ name: s })),
-      links: links.map(l => ({ source: l.source, target: l.target, value: l.value }))
-    };
-    const graph = sankey(graphInput);
+  const graph = sankey({ nodes: freshNodes, links: freshLinks });
 
-    svg.append('g').selectAll('path')
-      .data(graph.links)
-      .join('path')
+  // Reposition nodes: real stages to evenly-spaced columns, pending node off-screen
+  graph.nodes.forEach(n => {
+    if (n.name === PENDING) {
+      n.x0 = pendingX; n.x1 = pendingX + NODE_W;
+    } else {
+      const col = activeStageNames.indexOf(n.name);
+      n.x0 = colX(col); n.x1 = n.x0 + NODE_W;
+    }
+  });
+  sankey.update(graph);
+
+  // ── Real links only ───────────────────────────────────────────────────────
+  svg.append('g')
+    .selectAll('path')
+    .data(graph.links.filter(l => !l.synthetic))
+    .join('path')
       .attr('d', d3.sankeyLinkHorizontal())
-      .attr('stroke-width', d => Math.max(2, d.width))
-      .attr('stroke', d => STAGE_COLOR[d.source.name]?.link || 'rgba(78,203,128,0.18)')
       .attr('fill', 'none')
-      .attr('opacity', 0.75);
+      .attr('stroke', d => STAGE_COLOR[d.source.name]?.link || 'rgba(78,203,128,0.18)')
+      .attr('stroke-width', d => Math.max(2, d.width))
+      .attr('opacity', 0.72);
 
-    svg.append('g').selectAll('rect')
-      .data(graph.nodes)
-      .join('rect')
+  // ── Real nodes only ───────────────────────────────────────────────────────
+  const visibleNodes = graph.nodes.filter(n => n.name !== PENDING);
+
+  svg.append('g')
+    .selectAll('rect')
+    .data(visibleNodes)
+    .join('rect')
       .attr('x', d => d.x0).attr('y', d => d.y0)
       .attr('width', d => d.x1 - d.x0)
-      .attr('height', d => Math.max(4, d.y1 - d.y0))
+      .attr('height', d => Math.max(3, d.y1 - d.y0))
       .attr('rx', 2)
       .attr('fill', d => STAGE_COLOR[d.name]?.node || '#2a5c38')
       .attr('stroke', d => STAGE_COLOR[d.name]?.fg || '#4ecb80')
       .attr('stroke-width', 0.5);
 
-    svg.append('g').selectAll('text')
-      .data(graph.nodes)
-      .join('text')
+  // ── Labels ────────────────────────────────────────────────────────────────
+  svg.append('g')
+    .selectAll('text')
+    .data(visibleNodes)
+    .join('text')
       .attr('x', d => {
         const cx = (d.x0 + d.x1) / 2;
-        return Math.max(PAD_L, Math.min(W - PAD_R / 2, cx));
+        if (cx < W * 0.15) return d.x0;
+        if (cx > W * 0.85) return d.x1;
+        return cx;
       })
-      .attr('y', d => d.y0 - 6)
+      .attr('y', d => d.y0 - 5)
       .attr('text-anchor', d => {
         const cx = (d.x0 + d.x1) / 2;
-        if (cx < W * 0.2) return 'start';
-        if (cx > W * 0.8) return 'end';
+        if (cx < W * 0.15) return 'start';
+        if (cx > W * 0.85) return 'end';
         return 'middle';
       })
       .attr('font-family', "'Share Tech Mono', monospace")
       .attr('font-size', 10)
       .attr('fill', d => STAGE_COLOR[d.name]?.fg || '#4ecb80')
       .text(d => `${d.name} (${stageCount[d.name] || 0})`);
-  }
-
-  // ── Manual orphan nodes, proportionally sized ───────────────────────────
-  // Scale: total jobs maps to (H - LABEL_H - padding). Each orphan gets a
-  // bar height proportional to its count vs the largest linked node's count,
-  // using the same total-flow denominator d3-sankey would use.
-  if (orphanNames.length > 0) {
-    const totalFlow = jobs.length;
-    const availH = H - LABEL_H - 16;
-
-    orphanNames.forEach(name => {
-      const count = stageCount[name] || 0;
-      if (count === 0) return;
-      const barH = Math.max(6, Math.round((count / totalFlow) * availH));
-      const x = colX(name);
-      const y = LABEL_H + Math.round((availH - barH) / 2) + 8;
-      const c = STAGE_COLOR[name];
-      const labelX = Math.max(PAD_L, Math.min(W - PAD_R / 2, x + NODE_W / 2));
-
-      svg.append('rect')
-        .attr('x', x).attr('y', y)
-        .attr('width', NODE_W).attr('height', barH)
-        .attr('rx', 2)
-        .attr('fill', c?.node || '#2a5c38')
-        .attr('stroke', c?.fg || '#4ecb80')
-        .attr('stroke-width', 0.5);
-
-      svg.append('text')
-        .attr('x', labelX).attr('y', y - 6)
-        .attr('text-anchor', x < W / 2 ? 'start' : 'end')
-        .attr('font-family', "'Share Tech Mono', monospace")
-        .attr('font-size', 10)
-        .attr('fill', c?.fg || '#4ecb80')
-        .text(`${name} (${count})`);
-    });
-  }
 }
 
 // ── Stats ───────────────────────────────────────────────────────────────────
@@ -1165,9 +1160,9 @@ function renderList() {
 
 // ── Render ──────────────────────────────────────────────────────────────────
 function render() {
-  renderStats();
-  drawSankey();
-  renderList();
+  try { renderStats(); } catch(e) { console.error('renderStats failed:', e); }
+  try { drawSankey();  } catch(e) { console.error('drawSankey failed:', e); }
+  try { renderList();  } catch(e) { console.error('renderList failed:', e); }
 }
 
 function printReport() {
