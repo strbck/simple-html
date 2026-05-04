@@ -864,7 +864,11 @@ function renderStageChips(stages) {
 }
 
 function populateAdvanceSelect(currentStages) {
-  const remaining = STAGES.filter(s => !currentStages.includes(s));
+  const lastStage = currentStages[currentStages.length - 1];
+  const lastIdx = STAGES.indexOf(lastStage);
+  // Only offer stages that come after the current last stage canonically,
+  // excluding any already in the history (e.g. if they went back to add one)
+  const remaining = STAGES.slice(lastIdx + 1).filter(s => !currentStages.includes(s));
   const sel = document.getElementById('advance-select');
   sel.innerHTML = remaining.map(s => `<option value="${s}">${s}</option>`).join('');
 }
