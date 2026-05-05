@@ -65,7 +65,8 @@
     color: var(--muted);
     background: transparent;
     border: 0.5px solid var(--border);
-    padding: 6px 14px;
+    padding: 8px 14px;
+    min-height: 40px;
     border-radius: 3px;
     cursor: pointer;
     letter-spacing: 0.1em;
@@ -92,6 +93,8 @@
   /* ── Mode tabs ───────────────────────────── */
   .mode-tabs {
     display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
     gap: 6px;
     background: var(--surface);
     border: 0.5px solid var(--border);
@@ -107,6 +110,7 @@
     background: transparent;
     border: none;
     padding: 7px 18px;
+    min-height: 40px;
     border-radius: 3px;
     cursor: pointer;
     transition: all 0.15s;
@@ -127,13 +131,15 @@
 
   .timer-ring-wrap {
     position: relative;
-    width: 280px;
-    height: 280px;
+    width: min(280px, calc(100vw - 48px));
+    height: min(280px, calc(100vw - 48px));
   }
 
   .timer-ring-wrap svg {
     position: absolute;
     top: 0; left: 0;
+    width: 100%;
+    height: 100%;
     transform: rotate(-90deg);
   }
 
@@ -162,7 +168,7 @@
 
   .timer-display {
     font-family: var(--mono);
-    font-size: 64px;
+    font-size: clamp(36px, 17vw, 64px);
     line-height: 1;
     color: var(--text);
     letter-spacing: -0.02em;
@@ -196,6 +202,7 @@
     background: transparent;
     color: var(--muted);
     padding: 8px 16px;
+    min-height: 44px;
   }
   .ctrl-btn:hover { color: var(--text); border-color: var(--border2); }
 
@@ -212,6 +219,7 @@
     color: var(--accent);
     padding: 12px 40px;
     min-width: 140px;
+    min-height: 44px;
   }
   .ctrl-btn-primary:hover { background: var(--accent-d2); }
 
@@ -304,6 +312,8 @@
     max-width: 680px;
     flex-direction: column;
     gap: 20px;
+    margin: 0 auto;
+    padding: 40px 24px;
   }
   #stats-panel.visible { display: flex; }
 
@@ -420,6 +430,8 @@
     max-width: 440px;
     flex-direction: column;
     gap: 20px;
+    margin: 0 auto;
+    padding: 40px 24px;
   }
   #settings-panel.visible { display: flex; }
 
@@ -510,12 +522,37 @@
   }
 
   /* ── Responsive ──────────────────────────── */
-  @media (max-width: 540px) {
-    .timer-display { font-size: 52px; }
-    .timer-ring-wrap { width: 240px; height: 240px; }
+  @media (max-width: 600px) {
+    header { padding: 10px 16px; }
+    main { padding: 24px 16px; gap: 28px; }
+
+    #stats-panel,
+    #settings-panel { padding: 24px 16px 36px; }
+
     .stats-grid { grid-template-columns: repeat(2, 1fr); }
-    header { padding: 12px 16px; }
-    main { padding: 28px 16px; }
+
+    .notif {
+      bottom: 16px;
+      right: 16px;
+      left: 16px;
+      max-width: none;
+    }
+
+    /* Compress controls a bit so they don't crowd */
+    .controls { gap: 8px; }
+    .ctrl-btn { padding: 8px 12px; }
+    .ctrl-btn-primary { padding: 12px 28px; min-width: 120px; }
+  }
+
+  @media (max-width: 380px) {
+    /* On very narrow screens collapse stats to one column */
+    .stats-grid { grid-template-columns: 1fr; }
+
+    /* Tighten mode tabs */
+    .mode-tab { padding: 7px 10px; }
+
+    /* Keep controls from overflowing */
+    .ctrl-btn-primary { min-width: 100px; padding: 12px 18px; }
   }
 </style>
 </head>
